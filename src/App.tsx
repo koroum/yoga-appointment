@@ -8,12 +8,12 @@ import { GuestProfile } from './pages/GuestProfile'
 import { Dashboard } from './pages/instructor/Dashboard'
 import { Availability } from './pages/instructor/Availability'
 import { InstructorProfile } from './pages/instructor/Profile'
+import { InstructorRequests } from './pages/instructor/Requests'
+import { Browse } from './pages/student/Browse'
+import { MyBookings } from './pages/student/MyBookings'
 
 // Placeholder pages — replaced in subsequent phases
 function InstructorStudents() { return <div className="p-4">Students — Phase 10</div> }
-function InstructorRequests() { return <div className="p-4">Booking Requests — Phase 4</div> }
-function StudentBrowse() { return <div className="p-4">Browse Classes — Phase 4</div> }
-function StudentBookings() { return <div className="p-4">My Bookings — Phase 4</div> }
 
 export default function App() {
   return (
@@ -46,10 +46,10 @@ export default function App() {
 
           {/* Student-only */}
           <Route path="/student/browse" element={
-            <ProtectedRoute requiredRole="student"><StudentBrowse /></ProtectedRoute>
+            <ProtectedRoute requiredRole="student"><Browse /></ProtectedRoute>
           } />
           <Route path="/student/bookings" element={
-            <ProtectedRoute requiredRole="student"><StudentBookings /></ProtectedRoute>
+            <ProtectedRoute requiredRole="student"><MyBookings /></ProtectedRoute>
           } />
 
           {/* Fallback */}
