@@ -4,10 +4,12 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Navbar } from '../../components/Navbar'
 import { compressImage } from '../../utils/imageCompression'
+import { logger } from '../../utils/logger'
 
 export function InstructorProfile() {
   const { user } = useAuth()
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [bio, setBio] = useState('')
   const [passion, setPassion] = useState('')
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
@@ -17,29 +19,43 @@ export function InstructorProfile() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (user) loadProfile()
   }, [user])
 
   async function loadProfile() {
-    const { data: userData } = await supabase.from('users').select('name, username').eq('id', user!.id).single()
-    const { data: profile } = await supabase.from('instructor_profiles').select('bio, passion, photo_urls').eq('user_id', user!.id).single()
-
-    setName(userData?.name ?? '')
-    setUsername(userData?.username ?? '')
-    setBio(profile?.bio ?? '')
-    setPassion(profile?.passion ?? '')
-    setPhotoUrls(profile?.photo_urls ?? [])
-    setLoading(false)
+    try {
+      const [{ data: userData, error: userError }, { data: profile, error: profileError }] = await Promise.all([
+        supabase.from('users').select('name, username, phone').eq('id', user!.id).single(),
+        supabase.from('instructor_profiles').select('bio, passion, photo_urls').eq('user_id', user!.id).single(),
+      ])
+      if (userError) logger.error('Profile: failed to load user data', userError)
+      if (profileError && profileError.code !== 'PGRST116') logger.warn('Profile: no profile row yet', profileError)
+      logger.info('Profile: loaded for user', user!.id)
+      setName(userData?.name ?? '')
+      setPhone(userData?.phone ?? '')
+      setUsername(userData?.username ?? '')
+      setBio(profile?.bio ?? '')
+      setPassion(profile?.passion ?? '')
+      setPhotoUrls(profile?.photo_urls ?? [])
+    } catch (err: unknown) {
+      logger.error('Profile loadProfile:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSave() {
     setError(null)
     setSaving(true)
     try {
-      await supabase.from('users').update({ name }).eq('id', user!.id)
-      await supabase.from('instructor_profiles').upsert({ user_id: user!.id, bio, passion, photo_urls: photoUrls })
+      const { error: userError } = await supabase.from('users').update({ name, phone: phone || null }).eq('id', user!.id)
+      if (userError) throw userError
+      const { error: profileError } = await supabase.from('instructor_profiles').upsert({ user_id: user!.id, bio, passion, photo_urls: photoUrls }, { onConflict: 'user_id' })
+      if (profileError) throw profileError
+      logger.info('Profile: saved successfully')
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -104,10 +120,15 @@ export function InstructorProfile() {
           <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">Your profile URL</p>
           <p className="text-sm text-gray-700 break-all">{profileUrl}</p>
           <button
-            onClick={() => navigator.clipboard.writeText(profileUrl)}
+            onClick={() => {
+              navigator.clipboard.writeText(profileUrl).then(() => {
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              })
+            }}
             className="mt-2 text-xs text-indigo-600 font-medium"
           >
-            Copy link
+            {copied ? 'Copied!' : 'Copy link'}
           </button>
         </div>
 
@@ -118,6 +139,17 @@ export function InstructorProfile() {
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+1 (555) 123-4567"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { logger } from '../utils/logger'
 
 export function AuthCallback() {
   const navigate = useNavigate()
@@ -20,34 +21,41 @@ export function AuthCallback() {
       const accessToken = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
 
+      logger.debug('AuthCallback: url', window.location.href)
       try {
         if (code) {
-          // PKCE flow
+          logger.debug('AuthCallback: exchanging PKCE code')
           await supabase.auth.exchangeCodeForSession(code)
         } else if (tokenHash && type) {
-          // Email OTP / magic link
+          logger.debug('AuthCallback: verifying OTP token_hash type=', type)
           await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
         } else if (accessToken && refreshToken) {
-          // Implicit flow (legacy)
+          logger.debug('AuthCallback: setting session from hash tokens')
           await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        } else {
+          logger.warn('AuthCallback: no recognized auth params in URL')
         }
 
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error('No user after callback')
+        logger.info('AuthCallback: user', user.id, 'authenticated')
 
-        // Get role from public users table
-        const { data: userData } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
+
+        if (userError) logger.warn('AuthCallback: could not fetch role', userError)
+        logger.info('AuthCallback: role =', userData?.role, '→ redirecting')
 
         if (userData?.role === 'instructor') {
           navigate('/instructor/dashboard', { replace: true })
         } else {
           navigate('/student/browse', { replace: true })
         }
-      } catch {
+      } catch (err: unknown) {
+        logger.error('AuthCallback: failed', err)
         navigate('/login?error=auth_failed', { replace: true })
       }
     }

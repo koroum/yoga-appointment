@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Navbar } from '../../components/Navbar'
 import { InstructorBookModal } from '../../components/InstructorBookModal'
+import { logger } from '../../utils/logger'
 import type { SlotWithClass, StudentNotificationPref } from '../../types'
 
 interface StudentRow {
@@ -26,6 +27,7 @@ export function InstructorStudents() {
   const [togglingPref, setTogglingPref] = useState<string | null>(null)
   const [bookingDone, setBookingDone] = useState<string | null>(null) // student id
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) loadData()
@@ -33,8 +35,9 @@ export function InstructorStudents() {
 
   async function loadData() {
     setLoading(true)
-
-    const [{ data: links }, { data: prefs }, { data: slotsData }] = await Promise.all([
+    setLoadError(null)
+    try {
+    const [{ data: links, error: linksError }, { data: prefs }, { data: slotsData }] = await Promise.all([
       supabase
         .from('instructor_students')
         .select('student_id, linked_via, linked_at, student:users!instructor_students_student_id_fkey(id, name, email, phone)')
@@ -52,6 +55,9 @@ export function InstructorStudents() {
         .gte('starts_at', new Date().toISOString())
         .order('starts_at', { ascending: true }),
     ])
+
+    if (linksError) throw linksError
+    logger.info('Students: loaded', links?.length, 'students')
 
     const prefsMap: Record<string, StudentNotificationPref> = {}
     for (const p of prefs ?? []) {
@@ -105,41 +111,51 @@ export function InstructorStudents() {
       setAvailableSlots([])
     }
 
-    setLoading(false)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load students'
+      logger.error('Students loadData:', err)
+      setLoadError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleToggleReminders(student: StudentRow) {
     setTogglingPref(student.id)
-    const newValue = !student.reminders_enabled
-    if (student.pref_id) {
-      await supabase.from('student_notification_prefs')
-        .update({ reminders_enabled: newValue, updated_at: new Date().toISOString() })
-        .eq('id', student.pref_id)
-    } else {
-      await supabase.from('student_notification_prefs').insert({
+    try {
+      const newValue = !student.reminders_enabled
+      const { error } = await supabase.from('student_notification_prefs').upsert({
         instructor_id: user!.id,
         student_id: student.id,
         reminders_enabled: newValue,
-      })
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'instructor_id,student_id' })
+      if (error) throw error
+      logger.info('Students: toggled reminders for', student.id, '→', newValue)
+      await loadData()
+    } catch (err: unknown) {
+      logger.error('Students handleToggleReminders:', err)
+    } finally {
+      setTogglingPref(null)
     }
-    setStudents(prev => prev.map(s =>
-      s.id === student.id ? { ...s, reminders_enabled: newValue } : s
-    ))
-    setTogglingPref(null)
   }
 
   async function handleDirectBook(slot: SlotWithClass) {
     if (!bookingFor) return
+    logger.info('Students: direct-booking slot', slot.id, 'for student', bookingFor.id)
     const { data, error } = await supabase.rpc('book_slot', {
       p_slot_id: slot.id,
       p_student_id: bookingFor.id,
       p_booked_by: 'instructor',
     })
-    if (error) throw error
+    if (error) {
+      logger.error('Students handleDirectBook book_slot error:', error)
+      throw error
+    }
     const bookingId = data as string
-    supabase.functions.invoke('send-notifications', {
-      body: { booking_id: bookingId, type: 'booking_confirmed' },
-    })
+    logger.info('Students: booking created', bookingId)
+    supabase.functions.invoke('send-notifications', { body: { booking_id: bookingId, type: 'booking_confirmed' } })
+      .then(({ error: e }) => { if (e) logger.warn('send-notifications failed:', e) })
     setBookingDone(bookingFor.id)
     setBookingFor(null)
     await loadData()
@@ -153,6 +169,12 @@ export function InstructorStudents() {
           <Link to="/instructor/dashboard" className="text-sm text-indigo-600">← Dashboard</Link>
         </div>
         <h1 className="text-xl font-bold text-gray-900">Students</h1>
+
+        {loadError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
+            {loadError} — <button onClick={loadData} className="underline">Retry</button>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-16">

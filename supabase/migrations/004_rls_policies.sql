@@ -43,6 +43,14 @@ create policy "users: instructor reads linked students" on public.users
 create policy "users: anon reads instructors" on public.users
   for select using (role = 'instructor');
 
+-- Users can insert their own row (on signup)
+create policy "users: insert own" on public.users
+  for insert with check (id = auth.uid());
+
+-- Users can update their own row
+create policy "users: update own" on public.users
+  for update using (id = auth.uid());
+
 -- ─────────────────────────────────────────────
 -- instructor_profiles
 -- ─────────────────────────────────────────────

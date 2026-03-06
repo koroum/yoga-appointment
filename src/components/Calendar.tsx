@@ -24,8 +24,8 @@ export function Calendar({ markedDays = {}, selectedDate, onSelectDate }: Props)
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) })
   const firstDayOfWeek = getDay(startOfMonth(month)) // 0=Sun
 
-  // Pad with empty cells before first day (week starts Monday: shift Sunday to end)
-  const paddingDays = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
+  // Pad with empty cells before first day (week starts Sunday)
+  const paddingDays = firstDayOfWeek
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -38,7 +38,7 @@ export function Calendar({ markedDays = {}, selectedDate, onSelectDate }: Props)
 
       {/* Day headers */}
       <div className="grid grid-cols-7 mb-1">
-        {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
           <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
         ))}
       </div>

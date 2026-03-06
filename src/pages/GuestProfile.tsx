@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatInNY } from '../utils/dates'
+import { logger } from '../utils/logger'
 import type { SlotWithClass } from '../types'
 
 interface InstructorData {
@@ -29,54 +30,62 @@ export function GuestProfile() {
 
   async function loadProfile(uname: string) {
     setLoading(true)
+    try {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('id, name, username, instructor_profiles(bio, passion, photo_urls)')
+        .eq('username', uname)
+        .eq('role', 'instructor')
+        .single()
 
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, name, username, instructor_profiles(bio, passion, photo_urls)')
-      .eq('username', uname)
-      .eq('role', 'instructor')
-      .single()
-
-    if (error || !user) {
-      setNotFound(true)
-      setLoading(false)
-      return
-    }
-
-    const profile = Array.isArray(user.instructor_profiles)
-      ? user.instructor_profiles[0] ?? null
-      : user.instructor_profiles ?? null
-
-    setInstructor({ id: user.id, name: user.name, username: user.username!, profile })
-
-    // Fetch upcoming available slots with class info
-    const { data: slotRows } = await supabase
-      .from('slots')
-      .select('*, class:classes(*)')
-      .eq('instructor_id', user.id)
-      .eq('status', 'available')
-      .gte('starts_at', new Date().toISOString())
-      .order('starts_at', { ascending: true })
-      .limit(10)
-
-    if (slotRows) {
-      // Get confirmed booking counts per slot
-      const slotIds = slotRows.map(s => s.id)
-      const { data: bookingCounts } = await supabase
-        .from('bookings')
-        .select('slot_id')
-        .in('slot_id', slotIds)
-        .eq('status', 'confirmed')
-
-      const countMap: Record<string, number> = {}
-      for (const b of bookingCounts ?? []) {
-        countMap[b.slot_id] = (countMap[b.slot_id] ?? 0) + 1
+      if (error || !user) {
+        logger.info('GuestProfile: instructor not found for username', uname, error?.message)
+        setNotFound(true)
+        return
       }
 
-      setSlots(slotRows.map(s => ({ ...s, confirmed_count: countMap[s.id] ?? 0 })))
-    }
+      logger.info('GuestProfile: loaded instructor', user.id, user.name)
+      const profile = Array.isArray(user.instructor_profiles)
+        ? user.instructor_profiles[0] ?? null
+        : user.instructor_profiles ?? null
 
-    setLoading(false)
+      setInstructor({ id: user.id, name: user.name, username: user.username!, profile })
+
+      const { data: slotRows, error: slotsError } = await supabase
+        .from('slots')
+        .select('*, class:classes(*)')
+        .eq('instructor_id', user.id)
+        .eq('status', 'available')
+        .gte('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: true })
+        .limit(10)
+
+      if (slotsError) logger.warn('GuestProfile: failed to load slots', slotsError)
+
+      if (slotRows && slotRows.length > 0) {
+        const slotIds = slotRows.map(s => s.id)
+        const { data: bookingCounts, error: countsError } = await supabase
+          .from('bookings')
+          .select('slot_id')
+          .in('slot_id', slotIds)
+          .eq('status', 'confirmed')
+
+        if (countsError) logger.warn('GuestProfile: failed to load booking counts', countsError)
+
+        const countMap: Record<string, number> = {}
+        for (const b of bookingCounts ?? []) {
+          countMap[b.slot_id] = (countMap[b.slot_id] ?? 0) + 1
+        }
+
+        setSlots(slotRows.map(s => ({ ...s, confirmed_count: countMap[s.id] ?? 0 })))
+        logger.info('GuestProfile: loaded', slotRows.length, 'slots')
+      }
+    } catch (err: unknown) {
+      logger.error('GuestProfile loadProfile:', err)
+      setNotFound(true)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (loading) {
@@ -103,7 +112,7 @@ export function GuestProfile() {
     <div className="min-h-screen bg-gray-50">
       {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-4 h-14 flex items-center">
-        <span className="font-bold text-indigo-600 text-lg">YogaBook</span>
+        <span className="font-bold text-indigo-600 text-lg">Yoga Booking</span>
       </nav>
 
       <div className="max-w-lg mx-auto pb-16">

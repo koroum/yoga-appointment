@@ -7,10 +7,18 @@ import { Navbar } from '../../components/Navbar'
 import { BookingStatusBadge } from '../../components/BookingStatusBadge'
 import { Calendar, type DayStatus } from '../../components/Calendar'
 import { formatInNY } from '../../utils/dates'
-import type { SlotWithClass, Booking } from '../../types'
+import { logger } from '../../utils/logger'
+import type { SlotWithClass } from '../../types'
+
+interface BookingWithStudent {
+  id: string
+  status: string
+  student_note: string | null
+  student: { name: string; email: string | null } | null
+}
 
 interface SlotWithBookings extends SlotWithClass {
-  bookings: Pick<Booking, 'id' | 'status'>[]
+  bookings: BookingWithStudent[]
 }
 
 export function Dashboard() {
@@ -19,6 +27,11 @@ export function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [pendingCount, setPendingCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [deletingSlot, setDeletingSlot] = useState<string | null>(null)
+  const [notifySlot, setNotifySlot] = useState<string | null>(null)
+  const [notifying, setNotifying] = useState<string | null>(null)
+  const [notifySuccess, setNotifySuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) loadSlots()
@@ -26,37 +39,101 @@ export function Dashboard() {
 
   async function loadSlots() {
     setLoading(true)
-    const { data } = await supabase
-      .from('slots')
-      .select('*, class:classes(*)')
-      .eq('instructor_id', user!.id)
-      .gte('starts_at', new Date().toISOString())
-      .order('starts_at', { ascending: true })
+    setLoadError(null)
+    try {
+      const { data, error } = await supabase
+        .from('slots')
+        .select('*, class:classes(*)')
+        .eq('instructor_id', user!.id)
+        .gte('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: true })
 
-    if (data) {
-      const slotIds = data.map(s => s.id)
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select('id, slot_id, status')
-        .in('slot_id', slotIds)
-        .neq('status', 'cancelled')
+      if (error) throw error
+      logger.info('Dashboard: loaded', data?.length, 'slots')
 
-      const bookingMap: Record<string, Pick<Booking, 'id' | 'status'>[]> = {}
-      for (const b of bookings ?? []) {
-        if (!bookingMap[b.slot_id]) bookingMap[b.slot_id] = []
-        bookingMap[b.slot_id].push({ id: b.id, status: b.status })
+      const slotIds = (data ?? []).map(s => s.id)
+
+      const bookingMap: Record<string, BookingWithStudent[]> = {}
+      if (slotIds.length > 0) {
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, slot_id, status, student_note, student:users!bookings_student_id_fkey(name, email)')
+          .in('slot_id', slotIds)
+          .neq('status', 'cancelled')
+
+        if (bookingsError) throw bookingsError
+
+        for (const b of bookings ?? []) {
+          if (!bookingMap[b.slot_id]) bookingMap[b.slot_id] = []
+          const student = Array.isArray(b.student) ? b.student[0] : b.student
+          bookingMap[b.slot_id].push({ id: b.id, status: b.status, student_note: b.student_note ?? null, student: student ?? null })
+        }
       }
 
-      const enriched = data.map(s => ({
+      const enriched = (data ?? []).map(s => ({
         ...s,
         confirmed_count: (bookingMap[s.id] ?? []).filter(b => b.status === 'confirmed').length,
         bookings: bookingMap[s.id] ?? [],
       }))
 
       setSlots(enriched)
-      setPendingCount(bookings?.filter(b => b.status === 'pending').length ?? 0)
+      const allBookings = Object.values(bookingMap).flat()
+      setPendingCount(allBookings.filter(b => b.status === 'pending').length)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to load dashboard'
+      logger.error('Dashboard loadSlots:', err)
+      setLoadError(msg)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
+  }
+
+  async function handleDeleteSlot(slotId: string) {
+    setDeletingSlot(slotId)
+    try {
+      const { error } = await supabase.from('slots').delete().eq('id', slotId)
+      if (error) {
+        logger.error('Dashboard: failed to delete slot', error)
+        setLoadError(error.message)
+      } else {
+        logger.info('Dashboard: deleted slot', slotId)
+        setSlots(prev => prev.filter(s => s.id !== slotId))
+      }
+    } finally {
+      setDeletingSlot(null)
+    }
+  }
+
+  async function handleNotify(slotId: string, channel: 'email' | 'sms' | 'both') {
+    setNotifying(slotId)
+    try {
+      const slot = slots.find(s => s.id === slotId)
+      if (!slot) return
+      const confirmedBookings = slot.bookings.filter(b => b.status === 'confirmed')
+      const channels = channel === 'both' ? ['email', 'sms'] : [channel]
+
+      await Promise.all(
+        confirmedBookings.map(b =>
+          Promise.all(
+            channels.map(ch =>
+              supabase.functions.invoke('send-notifications', {
+                body: { booking_id: b.id, type: 'reminder_manual', channel: ch },
+              })
+            )
+          )
+        )
+      )
+
+      logger.info('Dashboard: sent notifications for slot', slotId, 'via', channel)
+      setNotifySuccess(slotId)
+      setTimeout(() => setNotifySuccess(null), 3000)
+    } catch (err) {
+      logger.error('Dashboard: notify failed', err)
+      setLoadError('Failed to send notifications')
+    } finally {
+      setNotifying(null)
+      setNotifySlot(null)
+    }
   }
 
   // Build calendar markers
@@ -88,6 +165,12 @@ export function Dashboard() {
       <Navbar />
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+
+        {loadError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">
+            {loadError} — <button onClick={loadSlots} className="underline">Retry</button>
+          </div>
+        )}
 
         <Calendar markedDays={markedDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
@@ -121,8 +204,60 @@ export function Dashboard() {
                         </p>
                         <BookingStatusBadge status={slot.status === 'unavailable' ? 'unavailable' : open === 0 ? 'confirmed' : 'available'} className="mt-2" />
                       </div>
-                      <Link to="/instructor/requests" className="text-sm text-indigo-600 font-medium shrink-0">View →</Link>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {pending > 0 && (
+                          <Link to="/instructor/requests" className="text-sm text-indigo-600 font-medium">Review →</Link>
+                        )}
+                        {confirmed > 0 && (
+                          notifySuccess === slot.id ? (
+                            <span className="text-xs text-green-600 font-medium">Sent!</span>
+                          ) : notifying === slot.id ? (
+                            <span className="text-xs text-gray-400">Sending…</span>
+                          ) : (
+                            <div className="relative">
+                              <button
+                                onClick={() => setNotifySlot(notifySlot === slot.id ? null : slot.id)}
+                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                              >
+                                Notify ▾
+                              </button>
+                              {notifySlot === slot.id && (
+                                <div className="absolute right-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-md py-1 z-50">
+                                  <button onClick={() => handleNotify(slot.id, 'email')} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Email</button>
+                                  <button onClick={() => handleNotify(slot.id, 'sms')} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">SMS</button>
+                                  <button onClick={() => handleNotify(slot.id, 'both')} className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50">Both</button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        )}
+                        {slot.bookings.length === 0 && (
+                          <button
+                            onClick={() => handleDeleteSlot(slot.id)}
+                            disabled={deletingSlot === slot.id}
+                            className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50"
+                          >
+                            {deletingSlot === slot.id ? 'Removing…' : 'Remove slot'}
+                          </button>
+                        )}
+                      </div>
                     </div>
+                    {slot.bookings.filter(b => b.status === 'confirmed').length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-50">
+                        <p className="text-xs text-gray-400 mb-1.5">Confirmed students</p>
+                        <div className="space-y-1">
+                          {slot.bookings.filter(b => b.status === 'confirmed').map(b => (
+                            <div key={b.id}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-700">{b.student?.name ?? 'Unknown'}</span>
+                                {b.student?.email && <span className="text-xs text-gray-400">{b.student.email}</span>}
+                              </div>
+                              {b.student_note && <p className="text-xs text-gray-400 italic ml-0.5">"{b.student_note}"</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}

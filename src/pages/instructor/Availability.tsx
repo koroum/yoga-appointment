@@ -4,6 +4,7 @@ import { format, addDays } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Navbar } from '../../components/Navbar'
+import { logger } from '../../utils/logger'
 import type { AvailabilityRule, Class, Slot } from '../../types'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -21,8 +22,26 @@ interface RuleForm {
   title: string
 }
 
+interface OneOffForm {
+  date: string
+  start_time: string
+  class_id: string
+  duration_minutes: number
+  max_capacity: number
+  title: string
+}
+
 const EMPTY_FORM: RuleForm = {
   day_of_week: 1,
+  start_time: '09:00',
+  class_id: '',
+  duration_minutes: 60,
+  max_capacity: 1,
+  title: '',
+}
+
+const EMPTY_ONEOFF: OneOffForm = {
+  date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
   start_time: '09:00',
   class_id: '',
   duration_minutes: 60,
@@ -37,6 +56,8 @@ export function Availability() {
   const [overrides, setOverrides] = useState<Slot[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState<RuleForm>(EMPTY_FORM)
+  const [showOneOff, setShowOneOff] = useState(false)
+  const [oneOff, setOneOff] = useState<OneOffForm>(EMPTY_ONEOFF)
   const [overrideDate, setOverrideDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,11 +67,15 @@ export function Availability() {
   }, [user])
 
   async function loadData() {
-    const [{ data: rulesData }, { data: classesData }, { data: slotsData }] = await Promise.all([
+    const [{ data: rulesData, error: rulesError }, { data: classesData, error: classesError }, { data: slotsData, error: slotsError }] = await Promise.all([
       supabase.from('availability_rules').select('*, class:classes(*)').eq('instructor_id', user!.id).eq('is_active', true).order('day_of_week'),
       supabase.from('classes').select('*').eq('instructor_id', user!.id).order('title'),
       supabase.from('slots').select('*').eq('instructor_id', user!.id).eq('status', 'unavailable').gte('starts_at', new Date().toISOString()).order('starts_at'),
     ])
+    if (rulesError) logger.error('Availability: failed to load rules', rulesError)
+    if (classesError) logger.error('Availability: failed to load classes', classesError)
+    if (slotsError) logger.error('Availability: failed to load overrides', slotsError)
+    logger.info('Availability: loaded', rulesData?.length, 'rules,', classesData?.length, 'classes')
     setRules((rulesData ?? []) as RuleWithClass[])
     setClasses(classesData ?? [])
     setOverrides(slotsData ?? [])
@@ -100,6 +125,48 @@ export function Availability() {
     await loadData()
   }
 
+  async function handleSaveOneOff() {
+    setError(null)
+    setSaving(true)
+    try {
+      let classId = oneOff.class_id
+
+      if (!classId) {
+        if (!oneOff.title.trim()) throw new Error('Please select an existing class or enter a class name')
+        const { data: newClass, error: classErr } = await supabase
+          .from('classes')
+          .insert({ instructor_id: user!.id, title: oneOff.title.trim(), max_capacity: oneOff.max_capacity, duration_minutes: oneOff.duration_minutes })
+          .select('id')
+          .single()
+        if (classErr) throw classErr
+        classId = newClass.id
+      }
+
+      const selectedClass = classes.find(c => c.id === classId)
+      const durationMin = selectedClass?.duration_minutes ?? oneOff.duration_minutes
+
+      const starts = new Date(`${oneOff.date}T${oneOff.start_time}:00`)
+      const ends = new Date(starts.getTime() + durationMin * 60 * 1000)
+
+      const { error: slotErr } = await supabase.from('slots').insert({
+        class_id: classId,
+        instructor_id: user!.id,
+        starts_at: starts.toISOString(),
+        ends_at: ends.toISOString(),
+        status: 'available',
+      })
+      if (slotErr) throw slotErr
+
+      setShowOneOff(false)
+      setOneOff(EMPTY_ONEOFF)
+      await loadData()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create slot')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleAddOverride() {
     setError(null)
     setSaving(true)
@@ -125,13 +192,20 @@ export function Availability() {
   }
 
   async function handleRemoveOverride(id: string) {
-    await supabase.from('slots').delete().eq('id', id)
+    const { error } = await supabase.from('slots').delete().eq('id', id)
+    if (error) logger.error('Availability: failed to remove override', error)
     await loadData()
   }
 
   async function generateSlots() {
-    // Invoke generate-slots edge function
-    await supabase.functions.invoke('generate-slots', { body: { instructor_id: user!.id } })
+    logger.info('Availability: invoking generate-slots for', user!.id)
+    const { data, error } = await supabase.functions.invoke('generate-slots', { body: { instructor_id: user!.id } })
+    if (error) {
+      logger.error('Availability: generate-slots failed', error)
+      setError('Slots could not be generated automatically. Make sure edge functions are running (npx supabase functions serve).')
+    } else {
+      logger.info('Availability: generate-slots result', data)
+    }
   }
 
   return (
@@ -238,6 +312,85 @@ export function Availability() {
             <button onClick={() => setShowAddForm(true)}
               className="mt-2 w-full border border-dashed border-gray-300 rounded-xl py-3 text-sm text-gray-400 hover:border-indigo-300 hover:text-indigo-600">
               + Add recurring slot
+            </button>
+          )}
+        </div>
+
+        {/* One-time Slot */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">One-time Slot</h2>
+
+          {showOneOff ? (
+            <div className="bg-white rounded-xl border border-indigo-200 p-4 space-y-3">
+              <p className="font-medium text-gray-900 text-sm">New one-time slot</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Date</label>
+                  <input type="date" value={oneOff.date} onChange={e => setOneOff(f => ({ ...f, date: e.target.value }))}
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Time</label>
+                  <input type="time" value={oneOff.start_time} onChange={e => setOneOff(f => ({ ...f, start_time: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" />
+                </div>
+              </div>
+
+              {classes.length > 0 && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Class (existing)</label>
+                  <select value={oneOff.class_id} onChange={e => setOneOff(f => ({ ...f, class_id: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm">
+                    <option value="">— create new —</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {!oneOff.class_id && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Class name</label>
+                    <input type="text" value={oneOff.title} onChange={e => setOneOff(f => ({ ...f, title: e.target.value }))}
+                      placeholder="e.g. Special Workshop"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Duration (min)</label>
+                      <input type="number" value={oneOff.duration_minutes} onChange={e => setOneOff(f => ({ ...f, duration_minutes: +e.target.value }))}
+                        min={15} max={240}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Max spots</label>
+                      <input type="number" value={oneOff.max_capacity} onChange={e => setOneOff(f => ({ ...f, max_capacity: +e.target.value }))}
+                        min={1} max={100}
+                        className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm" />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {error && <p className="text-red-600 text-xs">{error}</p>}
+
+              <div className="flex gap-2">
+                <button onClick={handleSaveOneOff} disabled={saving}
+                  className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Create slot'}
+                </button>
+                <button onClick={() => { setShowOneOff(false); setOneOff(EMPTY_ONEOFF); setError(null) }}
+                  className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowOneOff(true)}
+              className="w-full border border-dashed border-gray-300 rounded-xl py-3 text-sm text-gray-400 hover:border-indigo-300 hover:text-indigo-600">
+              + Add one-time slot
             </button>
           )}
         </div>

@@ -90,6 +90,8 @@ export interface Booking {
   booked_by: 'instructor' | 'student'
   cancellation_requested_at: string | null
   proposed_slot_id: string | null
+  student_note: string | null
+  instructor_note: string | null
   created_at: string
 }
 

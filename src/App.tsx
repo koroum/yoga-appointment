@@ -12,6 +12,7 @@ import { InstructorRequests } from './pages/instructor/Requests'
 import { InstructorStudents } from './pages/instructor/Students'
 import { Browse } from './pages/student/Browse'
 import { MyBookings } from './pages/student/MyBookings'
+import { StudentProfile } from './pages/student/Profile'
 
 export default function App() {
   return (
@@ -48,6 +49,9 @@ export default function App() {
           } />
           <Route path="/student/bookings" element={
             <ProtectedRoute requiredRole="student"><MyBookings /></ProtectedRoute>
+          } />
+          <Route path="/student/profile" element={
+            <ProtectedRoute requiredRole="student"><StudentProfile /></ProtectedRoute>
           } />
 
           {/* Fallback */}
