@@ -4,14 +4,14 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthCallback } from './pages/AuthCallback'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
+import { GuestProfile } from './pages/GuestProfile'
+import { Dashboard } from './pages/instructor/Dashboard'
+import { Availability } from './pages/instructor/Availability'
+import { InstructorProfile } from './pages/instructor/Profile'
 
 // Placeholder pages — replaced in subsequent phases
-function InstructorDashboard() { return <div className="p-4">Instructor Dashboard — Phase 3</div> }
-function InstructorAvailability() { return <div className="p-4">Availability — Phase 3</div> }
 function InstructorStudents() { return <div className="p-4">Students — Phase 10</div> }
 function InstructorRequests() { return <div className="p-4">Booking Requests — Phase 4</div> }
-function InstructorProfile() { return <div className="p-4">Edit Profile — Phase 3</div> }
-function GuestProfile() { return <div className="p-4">Public Profile — Phase 3</div> }
 function StudentBrowse() { return <div className="p-4">Browse Classes — Phase 4</div> }
 function StudentBookings() { return <div className="p-4">My Bookings — Phase 4</div> }
 
@@ -29,10 +29,10 @@ export default function App() {
 
           {/* Instructor-only */}
           <Route path="/instructor/dashboard" element={
-            <ProtectedRoute requiredRole="instructor"><InstructorDashboard /></ProtectedRoute>
+            <ProtectedRoute requiredRole="instructor"><Dashboard /></ProtectedRoute>
           } />
           <Route path="/instructor/availability" element={
-            <ProtectedRoute requiredRole="instructor"><InstructorAvailability /></ProtectedRoute>
+            <ProtectedRoute requiredRole="instructor"><Availability /></ProtectedRoute>
           } />
           <Route path="/instructor/students" element={
             <ProtectedRoute requiredRole="instructor"><InstructorStudents /></ProtectedRoute>
