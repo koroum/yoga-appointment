@@ -103,11 +103,12 @@ export function Browse() {
     })
 
     if (error) throw error
-    if (data && !data.ok) throw new Error(data.error ?? 'Booking failed')
+    // data is the booking UUID returned by book_slot()
+    const bookingId = data as string
 
     // Fire-and-forget notification
     supabase.functions.invoke('send-notifications', {
-      body: { booking_id: data.booking_id, type: 'booking_requested' },
+      body: { booking_id: bookingId, type: 'booking_requested' },
     })
 
     setBookingDone(slot.id)

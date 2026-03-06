@@ -9,11 +9,9 @@ import { Dashboard } from './pages/instructor/Dashboard'
 import { Availability } from './pages/instructor/Availability'
 import { InstructorProfile } from './pages/instructor/Profile'
 import { InstructorRequests } from './pages/instructor/Requests'
+import { InstructorStudents } from './pages/instructor/Students'
 import { Browse } from './pages/student/Browse'
 import { MyBookings } from './pages/student/MyBookings'
-
-// Placeholder pages — replaced in subsequent phases
-function InstructorStudents() { return <div className="p-4">Students — Phase 10</div> }
 
 export default function App() {
   return (
