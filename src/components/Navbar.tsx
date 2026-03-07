@@ -17,7 +17,7 @@ export function Navbar() {
   return (
     <nav className="bg-white border-b border-gray-200 px-4 h-14 flex items-center justify-between">
       <Link to={user ? dashboardPath : '/'} className="font-bold text-indigo-600 text-lg">
-        Yoga Booking
+        Booking
       </Link>
 
       {user ? (

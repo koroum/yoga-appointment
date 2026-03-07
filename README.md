@@ -1,6 +1,6 @@
-# Yoga Booking App
+# Booking App
 
-A simple, mobile-friendly booking platform connecting yoga instructors with their students — no spreadsheets, no back-and-forth messages.
+A simple, mobile-friendly booking platform connecting instructors with their students — no spreadsheets, no back-and-forth messages.
 
 ---
 

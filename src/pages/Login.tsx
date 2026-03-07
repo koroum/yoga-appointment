@@ -74,7 +74,7 @@ export function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center px-4">
       <div className="max-w-sm w-full mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Yoga Booking</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">Booking</h1>
         <p className="text-gray-500 mb-8 text-sm">Log in to your account</p>
 
         <div className="space-y-4">

@@ -43,9 +43,9 @@ describe('Navbar', () => {
     expect(screen.getByText('Log in')).toBeInTheDocument()
   })
 
-  it('shows app name "Yoga Booking"', () => {
+  it('shows app name "Booking"', () => {
     renderNavbar()
-    expect(screen.getByText('Yoga Booking')).toBeInTheDocument()
+    expect(screen.getByText('Booking')).toBeInTheDocument()
   })
 
   it('shows user name and dropdown toggle when authenticated as instructor', () => {

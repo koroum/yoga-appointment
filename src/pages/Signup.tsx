@@ -226,7 +226,7 @@ export function Signup({ instructorId, instructorName }: Props) {
           </>
         ) : (
           <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Yoga Booking</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Booking</h1>
             <p className="text-gray-500 mb-6 text-sm">Create your account</p>
 
             <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4">
