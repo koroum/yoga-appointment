@@ -13,6 +13,7 @@ export function InstructorProfile() {
   const [bio, setBio] = useState('')
   const [passion, setPassion] = useState('')
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
+  const [otherUrl, setOtherUrl] = useState('')
   const [username, setUsername] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -29,7 +30,7 @@ export function InstructorProfile() {
     try {
       const [{ data: userData, error: userError }, { data: profile, error: profileError }] = await Promise.all([
         supabase.from('users').select('name, username, phone').eq('id', user!.id).single(),
-        supabase.from('instructor_profiles').select('bio, passion, photo_urls').eq('user_id', user!.id).single(),
+        supabase.from('instructor_profiles').select('bio, passion, photo_urls, other_url').eq('user_id', user!.id).single(),
       ])
       if (userError) logger.error('Profile: failed to load user data', userError)
       if (profileError && profileError.code !== 'PGRST116') logger.warn('Profile: no profile row yet', profileError)
@@ -40,6 +41,7 @@ export function InstructorProfile() {
       setBio(profile?.bio ?? '')
       setPassion(profile?.passion ?? '')
       setPhotoUrls(profile?.photo_urls ?? [])
+      setOtherUrl((profile?.other_url as string | null) ?? '')
     } catch (err: unknown) {
       logger.error('Profile loadProfile:', err)
     } finally {
@@ -53,7 +55,7 @@ export function InstructorProfile() {
     try {
       const { error: userError } = await supabase.from('users').update({ name, phone: phone || null }).eq('id', user!.id)
       if (userError) throw userError
-      const { error: profileError } = await supabase.from('instructor_profiles').upsert({ user_id: user!.id, bio, passion, photo_urls: photoUrls }, { onConflict: 'user_id' })
+      const { error: profileError } = await supabase.from('instructor_profiles').upsert({ user_id: user!.id, bio, passion, photo_urls: photoUrls, other_url: otherUrl || null }, { onConflict: 'user_id' })
       if (profileError) throw profileError
       logger.info('Profile: saved successfully')
       setSaved(true)
@@ -113,7 +115,10 @@ export function InstructorProfile() {
         <div className="flex items-center gap-3">
           <Link to="/instructor/dashboard" className="text-sm text-indigo-600">← Dashboard</Link>
         </div>
-        <h1 className="text-xl font-bold text-gray-900">Edit Profile</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Edit Profile</h1>
+          <p className="text-xs text-gray-400 font-light mt-1">Instructor</p>
+        </div>
 
         {/* Profile URL */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
@@ -174,6 +179,18 @@ export function InstructorProfile() {
               placeholder="What drives your teaching..."
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Other URL (Optional)</label>
+            <input
+              type="url"
+              value={otherUrl}
+              onChange={e => setOtherUrl(e.target.value)}
+              placeholder="https://share.google/..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Paste any link (Google Reviews, website, etc.)</p>
           </div>
 
           {/* Photos */}

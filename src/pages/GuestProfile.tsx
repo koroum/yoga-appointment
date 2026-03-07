@@ -13,6 +13,7 @@ interface InstructorData {
     bio: string | null
     passion: string | null
     photo_urls: string[]
+    other_url: string | null
   } | null
 }
 
@@ -33,7 +34,7 @@ export function GuestProfile() {
     try {
       const { data: user, error } = await supabase
         .from('users')
-        .select('id, name, username, instructor_profiles(bio, passion, photo_urls)')
+        .select('id, name, username, instructor_profiles(bio, passion, photo_urls, other_url)')
         .eq('username', uname)
         .eq('role', 'instructor')
         .single()
@@ -129,7 +130,28 @@ export function GuestProfile() {
         <div className="mt-14 px-4">
           {/* Name + badge */}
           <h1 className="text-xl font-bold text-gray-900">{instructor?.name}</h1>
-          <p className="text-sm text-indigo-600 mt-0.5">✦ Certified Yoga Instructor</p>
+          <p className="text-xs text-gray-400 font-light">Instructor</p>
+          <p className="text-sm text-indigo-600 mt-1">✦ Certified Yoga Instructor</p>
+
+          {/* CTA - moved to top */}
+          <Link
+            to={`/signup?instructor=${instructor?.id}&username=${username}`}
+            className="block w-full bg-indigo-600 text-white text-center py-3 rounded-xl font-medium text-sm mt-4"
+          >
+            Book a Class / Sign Up
+          </Link>
+
+          {/* Other URL */}
+          {instructor?.profile?.other_url && (
+            <a
+              href={instructor.profile.other_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-white border border-gray-200 text-gray-700 text-center py-3 rounded-xl font-medium text-sm mt-2 hover:bg-gray-50"
+            >
+              → Visit Link
+            </a>
+          )}
 
           {/* Bio */}
           {instructor?.profile?.bio && (
@@ -180,16 +202,6 @@ export function GuestProfile() {
                 })}
               </div>
             )}
-          </div>
-
-          {/* CTA */}
-          <div className="mt-6">
-            <Link
-              to={`/signup?instructor=${instructor?.id}&username=${username}`}
-              className="block w-full bg-indigo-600 text-white text-center py-3 rounded-xl font-medium text-sm"
-            >
-              Book a Class / Sign Up
-            </Link>
           </div>
         </div>
       </div>

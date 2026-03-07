@@ -152,7 +152,8 @@ export function StudentProfile() {
         <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
           <div>
             <p className="font-semibold text-gray-900">{user?.name}</p>
-            {user?.email && <p className="text-sm text-gray-500">{user.email}</p>}
+            <p className="text-xs text-gray-400 font-light">Student</p>
+            {user?.email && <p className="text-sm text-gray-500 mt-1">{user.email}</p>}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Phone</label>

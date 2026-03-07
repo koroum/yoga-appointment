@@ -24,9 +24,13 @@ export function Navbar() {
         <div className="relative">
           <button
             onClick={() => setMenuOpen(o => !o)}
-            className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900"
+            className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
           >
-            {user.name ?? 'Account'} ▾
+            <div className="text-right">
+              <div>{user.name ?? 'Account'}</div>
+              <div className="text-xs text-gray-400 font-light leading-none">{role === 'instructor' ? 'Instructor' : 'Student'}</div>
+            </div>
+            ▾
           </button>
 
           {menuOpen && (
