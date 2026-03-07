@@ -181,18 +181,6 @@ export function InstructorProfile() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Other URL (Optional)</label>
-            <input
-              type="url"
-              value={otherUrl}
-              onChange={e => setOtherUrl(e.target.value)}
-              placeholder="https://share.google/..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">Paste any link (Google Reviews, website, etc.)</p>
-          </div>
-
           {/* Photos */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Photos</label>
@@ -218,6 +206,18 @@ export function InstructorProfile() {
               )}
             </div>
             <p className="text-xs text-gray-400 mt-1.5">Max 5MB · auto-compressed · up to 5 photos</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">My Other URL (Optional)</label>
+            <input
+              type="url"
+              value={otherUrl}
+              onChange={e => setOtherUrl(e.target.value)}
+              placeholder="https://share.google/..."
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Paste any link (Google Reviews, website, etc.)</p>
           </div>
         </div>
 
