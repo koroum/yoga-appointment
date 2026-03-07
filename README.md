@@ -1,73 +1,65 @@
-# React + TypeScript + Vite
+# Yoga Booking App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A simple, mobile-friendly booking platform connecting yoga instructors with their students — no spreadsheets, no back-and-forth messages.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## For Instructors
 
-## React Compiler
+**Set up your profile once. Share your link. Take bookings.**
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Public profile** — share `/instructor/your-name`; students see your bio, photos, upcoming classes, and any additional link (Google Reviews, website, etc.)
+- **Recurring availability** — define your weekly schedule (e.g. Mon/Wed/Fri 9am); the system auto-generates a rolling 2-month calendar
+- **One-off slots** — add extra classes or cancel empty slots anytime without notifying anyone
+- **Accept or decline requests** — students request a booking; you confirm or reject from your dashboard with one click
+- **Direct booking** — assign a student to a slot yourself; it's confirmed immediately with automatic notification to them
+- **Email + SMS notifications** — students are notified on every status change: confirmed, rejected, or cancelled
+- **Student roster** — see all students linked to you; manage reminder preferences per student (some prefer reminders, some don't)
+- **Optional profile link** — add a URL to your profile—Google Reviews, your website, or anything else you want to share
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## For Students
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Find your instructor. Book a class. Show up.**
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Discover via profile link** — visit your instructor's public link to see their bio, available classes, and sign up directly
+- **Browse your instructors' classes** — view upcoming slots for all instructors you're linked to in one place
+- **Request a booking** — pick a class time and submit your request; your instructor confirms it (usually within minutes)
+- **My bookings** — see all your upcoming and past bookings organized by date
+- **Smart cancellations** — cancel instantly if you're more than 24 hours out; within 24 hours a cancellation request goes to your instructor (they might suggest an alternative)
+- **Automatic reminders** — get email + SMS reminders at 28 hours and 4 hours before your class so you never miss it
+- **Link more instructors** — paste an instructor's profile link in your profile settings to add them and see their classes
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
+- **Backend**: Supabase (Postgres, Auth, Row-Level Security, Storage, Edge Functions)
+- **Notifications**: Resend (email), Twilio (SMS)
+- **Routing**: react-router-dom v7
+
+---
+
+## Local Development
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Copy `.env.example` to `.env.local` and fill in your Supabase credentials.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+supabase start
+supabase db reset   # applies all migrations + seed data
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## Testing
+
+```bash
+npm test
 ```
