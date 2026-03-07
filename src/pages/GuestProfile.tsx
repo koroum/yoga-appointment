@@ -143,14 +143,18 @@ export function GuestProfile() {
 
           {/* Other URL */}
           {instructor?.profile?.other_url && (
-            <a
-              href={instructor.profile.other_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-white border border-gray-200 text-gray-700 text-center py-3 rounded-xl font-medium text-sm mt-2 hover:bg-gray-50"
-            >
-              → Visit Link
-            </a>
+            <div className="mt-4 bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">My Other URL</p>
+              <p className="text-sm text-gray-700 break-all mb-3">{instructor.profile.other_url}</p>
+              <a
+                href={instructor.profile.other_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-indigo-600 text-white text-center py-2 rounded-lg font-medium text-sm hover:bg-indigo-700"
+              >
+                → Visit Link
+              </a>
+            </div>
           )}
 
           {/* Bio */}
