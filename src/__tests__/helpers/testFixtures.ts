@@ -30,6 +30,8 @@ export const mockBooking: Booking = {
   booked_by: 'student',
   cancellation_requested_at: null,
   proposed_slot_id: null,
+  student_note: null,
+  instructor_note: null,
   created_at: '2026-01-01T00:00:00Z',
 }
 
