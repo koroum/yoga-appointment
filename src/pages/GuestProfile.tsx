@@ -141,22 +141,6 @@ export function GuestProfile() {
             Book a Class / Sign Up
           </Link>
 
-          {/* Other URL */}
-          {instructor?.profile?.other_url && (
-            <div className="mt-4 bg-white rounded-xl p-4 border border-gray-100">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">My Other URL</p>
-              <p className="text-sm text-gray-700 break-all mb-3">{instructor.profile.other_url}</p>
-              <a
-                href={instructor.profile.other_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-indigo-600 text-white text-center py-2 rounded-lg font-medium text-sm hover:bg-indigo-700"
-              >
-                → Visit Link
-              </a>
-            </div>
-          )}
-
           {/* Bio */}
           {instructor?.profile?.bio && (
             <div className="mt-4 bg-white rounded-xl p-4 border border-gray-100">
@@ -176,6 +160,22 @@ export function GuestProfile() {
                   <img key={i} src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Other URL */}
+          {instructor?.profile?.other_url && (
+            <div className="mt-6 bg-white rounded-xl p-4 border border-gray-100">
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">My Other URL</p>
+              <p className="text-sm text-gray-700 break-all mb-3">{instructor.profile.other_url}</p>
+              <a
+                href={instructor.profile.other_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-indigo-600 text-white text-center py-2 rounded-lg font-medium text-sm hover:bg-indigo-700"
+              >
+                → Visit Link
+              </a>
             </div>
           )}
 
