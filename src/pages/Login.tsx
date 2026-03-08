@@ -36,24 +36,46 @@ export function Login() {
         .eq('id', authUser.id)
         .maybeSingle()
 
-      // If no users row exists (e.g. signup failed mid-way), create one from auth metadata
+      // If no users row exists by ID, check if one exists by email (from a previous signup attempt)
       if (!userData) {
         const meta = authUser.user_metadata ?? {}
         const userRole = meta.role || 'student'
         const userName = meta.name || email.trim().split('@')[0]
-        logger.info('Login: no users row found, creating one with role=', userRole)
-        const { error: insertErr } = await supabase.from('users').insert({
-          id: authUser.id,
-          name: userName,
-          role: userRole,
-          email: authUser.email ?? null,
-          phone: authUser.phone ?? null,
-        })
-        if (insertErr) {
-          logger.error('Login: failed to create user row', insertErr)
-          throw new Error('Your account setup is incomplete. Please try signing up again.')
+
+        // Check if a row exists with this email but a different auth ID
+        const { data: existingByEmail } = await supabase
+          .from('users')
+          .select('id, role')
+          .eq('email', authUser.email!)
+          .maybeSingle()
+
+        if (existingByEmail) {
+          // Update the existing row to use the current auth user ID
+          logger.info('Login: found existing user by email, updating ID to', authUser.id)
+          const { error: updateErr } = await supabase
+            .from('users')
+            .update({ id: authUser.id })
+            .eq('email', authUser.email!)
+          if (updateErr) {
+            logger.error('Login: failed to update user ID', updateErr)
+            throw new Error('Could not link your account. Please contact support.')
+          }
+          userData = { role: existingByEmail.role }
+        } else {
+          logger.info('Login: no users row found, creating one with role=', userRole)
+          const { error: insertErr } = await supabase.from('users').upsert({
+            id: authUser.id,
+            name: userName,
+            role: userRole,
+            email: authUser.email ?? null,
+            phone: authUser.phone ?? null,
+          })
+          if (insertErr) {
+            logger.error('Login: failed to create user row', insertErr)
+            throw new Error('Your account setup is incomplete. Please try signing up again.')
+          }
+          userData = { role: userRole }
         }
-        userData = { role: userRole }
       }
 
       const dest = userData.role === 'instructor' ? '/instructor/dashboard' : '/student/browse'

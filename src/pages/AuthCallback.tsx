@@ -58,26 +58,45 @@ export function AuthCallback() {
 
           logger.debug('AuthCallback: creating profile for', user.id, 'name=', name, 'role=', role)
 
-          const userRow = {
-            id: user.id,
-            name,
-            role,
-            email: user.email || null,
-            phone,
-            username: role === 'instructor'
-              ? name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
-              : null,
-          }
+          // Check if a row exists with this email but a different auth ID (re-signup)
+          const { data: existingByEmail } = await supabase
+            .from('users')
+            .select('id, role')
+            .eq('email', user.email!)
+            .maybeSingle()
 
-          const { error: upsertErr } = await supabase.from('users').upsert(userRow)
-          if (upsertErr) {
-            logger.error('AuthCallback: failed to create user profile', upsertErr)
-            if (upsertErr.message.includes('users_phone_key')) {
-              throw new Error('This phone number is already in use.')
+          if (existingByEmail && existingByEmail.id !== user.id) {
+            logger.info('AuthCallback: found existing user by email, updating ID from', existingByEmail.id, 'to', user.id)
+            const { error: updateErr } = await supabase
+              .from('users')
+              .update({ id: user.id, name, phone })
+              .eq('email', user.email!)
+            if (updateErr) {
+              logger.error('AuthCallback: failed to update user ID', updateErr)
+              throw updateErr
             }
-            throw upsertErr
+          } else if (!existingByEmail) {
+            const userRow = {
+              id: user.id,
+              name,
+              role,
+              email: user.email || null,
+              phone,
+              username: role === 'instructor'
+                ? name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+                : null,
+            }
+
+            const { error: upsertErr } = await supabase.from('users').upsert(userRow)
+            if (upsertErr) {
+              logger.error('AuthCallback: failed to create user profile', upsertErr)
+              if (upsertErr.message.includes('users_phone_key')) {
+                throw new Error('This phone number is already in use.')
+              }
+              throw upsertErr
+            }
           }
-          logger.info('AuthCallback: profile created for', user.id)
+          logger.info('AuthCallback: profile created/updated for', user.id)
 
           // Link student to instructor(s)
           if (role === 'student') {

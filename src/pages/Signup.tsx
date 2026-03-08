@@ -15,7 +15,7 @@ export function Signup({ instructorId, instructorName }: Props) {
   const [searchParams] = useSearchParams()
   const prefilledInstructorId = instructorId ?? searchParams.get('instructor') ?? undefined
 
-  const [role, setRole] = useState<UserRole>('student')
+  const [role, setRole] = useState<UserRole>('instructor')
   const [availableInstructors, setAvailableInstructors] = useState<{ id: string; name: string }[]>([])
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<Set<string>>(new Set())
   const [name, setName] = useState('')
@@ -50,11 +50,31 @@ export function Signup({ instructorId, instructorName }: Props) {
   const needsInstructorPick = role === 'student' && !prefilledInstructorId && availableInstructors.length > 0
   const canSubmit = name.trim() && (hasEmail || hasPhone) && password.length >= 6 && passwordsMatch && (!needsInstructorPick || selectedInstructorIds.size > 0)
 
+  /** Strip all non-digit characters except leading '+' */
+  function normalizePhone(raw: string): string {
+    const trimmed = raw.trim()
+    const startsWithPlus = trimmed.startsWith('+')
+    const digits = trimmed.replace(/\D/g, '')
+    return startsWithPlus ? `+${digits}` : digits
+  }
+
+  function validatePhone(raw: string): string | null {
+    const normalized = normalizePhone(raw)
+    if (!normalized.startsWith('+')) return 'Phone must start with + and country code (e.g. +1 for US, +91 for India).'
+    const digits = normalized.slice(1)
+    if (digits.length < 10) return 'Phone number is too short. Include country code + number (at least 10 digits).'
+    if (digits.length > 15) return 'Phone number is too long (max 15 digits).'
+    return null
+  }
+
   function validateForm(): string | null {
     if (!name.trim()) return 'Please enter your name.'
     if (!hasEmail && !hasPhone) return 'Please enter at least your email or phone number.'
     if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Please enter a valid email address.'
-    if (hasPhone && !/^\+?[0-9\s\-().]{7,}$/.test(phone.trim())) return 'Please enter a valid phone number (e.g. +1 555 000 0000).'
+    if (hasPhone) {
+      const phoneErr = validatePhone(phone)
+      if (phoneErr) return phoneErr
+    }
     if (password.length < 6) return 'Password must be at least 6 characters.'
     if (!passwordsMatch) return 'Passwords do not match.'
     return null
@@ -132,16 +152,16 @@ export function Signup({ instructorId, instructorName }: Props) {
 
             <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4">
               <button
-                onClick={() => setRole('student')}
-                className={`flex-1 py-2 text-sm font-medium ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}
-              >
-                I'm a student
-              </button>
-              <button
                 onClick={() => setRole('instructor')}
                 className={`flex-1 py-2 text-sm font-medium ${role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}
               >
                 I'm an instructor
+              </button>
+              <button
+                onClick={() => setRole('student')}
+                className={`flex-1 py-2 text-sm font-medium ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}
+              >
+                I'm a student
               </button>
             </div>
           </>
@@ -209,7 +229,7 @@ export function Signup({ instructorId, instructorName }: Props) {
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              placeholder="+1 555 000 0000"
+              placeholder="+1 555 000 0000 (include country code)"
               autoComplete="tel"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
