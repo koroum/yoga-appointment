@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { logger } from '../utils/logger'
-import { useAuth } from '../hooks/useAuth'
 import type { UserRole } from '../types'
 
 type Step = 'form' | 'verify_email' | 'verify_phone'
@@ -14,8 +13,6 @@ interface Props {
 
 export function Signup({ instructorId, instructorName }: Props) {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
-  const { refreshUser } = useAuth()
   const prefilledInstructorId = instructorId ?? searchParams.get('instructor') ?? undefined
 
   const [role, setRole] = useState<UserRole>('student')
@@ -26,7 +23,6 @@ export function Signup({ instructorId, instructorName }: Props) {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [otp, setOtp] = useState('')
   const [step, setStep] = useState<Step>('form')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -72,107 +68,34 @@ export function Signup({ instructorId, instructorName }: Props) {
 
     try {
       if (hasEmail) {
-        logger.debug('Signup: sending OTP to email', email.trim())
+        logger.debug('Signup: sending magic link to email', email.trim())
         const { error } = await supabase.auth.signInWithOtp({
           email: email.trim(),
-          options: { shouldCreateUser: true, data: { name: name.trim(), role } },
+          options: {
+            shouldCreateUser: true,
+            data: { name: name.trim(), role, phone: hasPhone ? phone.trim() : null, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          },
         })
         if (error) throw error
-        logger.info('Signup: OTP sent to email')
+        logger.info('Signup: magic link sent to email')
         setStep('verify_email')
       } else {
-        logger.debug('Signup: sending OTP to phone', phone.trim())
+        logger.debug('Signup: sending magic link to phone', phone.trim())
         const { error } = await supabase.auth.signInWithOtp({
           phone: phone.trim(),
-          options: { shouldCreateUser: true, data: { name: name.trim(), role } },
+          options: {
+            shouldCreateUser: true,
+            data: { name: name.trim(), role, email: null, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
+          },
         })
         if (error) throw error
-        logger.info('Signup: OTP sent to phone')
+        logger.info('Signup: magic link sent to phone')
         setStep('verify_phone')
       }
     } catch (err: unknown) {
-      logger.error('Signup: failed to send OTP', err)
+      logger.error('Signup: failed to send magic link', err)
       setError(err instanceof Error ? err.message : 'Signup failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleVerifyOtp() {
-    setError(null)
-    setLoading(true)
-    try {
-      let authUserId: string | undefined
-
-      if (step === 'verify_email') {
-        logger.debug('Signup: verifying email OTP')
-        const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: otp, type: 'email' })
-        if (error) throw error
-        authUserId = data.user?.id
-      } else {
-        logger.debug('Signup: verifying phone OTP')
-        const { data, error } = await supabase.auth.verifyOtp({ phone: phone.trim(), token: otp, type: 'sms' })
-        if (error) throw error
-        authUserId = data.user?.id
-      }
-
-      if (!authUserId) throw new Error('Could not get user ID after verification')
-      logger.info('Signup: OTP verified, user', authUserId)
-
-      // Set password so user can log in with email+password from now on
-      logger.debug('Signup: setting password for user', authUserId)
-      const { error: pwErr } = await supabase.auth.updateUser({ password })
-      if (pwErr) throw pwErr
-
-      // Upsert user row in public.users
-      const userRow = {
-        id: authUserId,
-        name: name.trim(),
-        role,
-        email: hasEmail ? email.trim() : null,
-        phone: hasPhone ? phone.trim() : null,
-        username: role === 'instructor'
-          ? name.trim().toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
-          : null,
-      }
-      logger.debug('Signup: upserting user row', userRow)
-      const { error: upsertErr } = await supabase.from('users').upsert(userRow)
-      if (upsertErr) {
-        logger.error('Signup: failed to create user profile', upsertErr)
-        if (upsertErr.message.includes('users_phone_key')) {
-          throw new Error('This phone number is already in use. Try a different number or log in to your existing account.')
-        }
-        throw new Error(`Failed to create your profile: ${upsertErr.message}`)
-      }
-      logger.info('Signup: user row created for', authUserId, 'role=', role)
-
-      // Link student to instructor(s)
-      if (role === 'student') {
-        const instructorIds = prefilledInstructorId
-          ? [prefilledInstructorId]
-          : [...selectedInstructorIds]
-
-        if (instructorIds.length > 0) {
-          logger.debug('Signup: linking student to', instructorIds.length, 'instructor(s)')
-          const rows = instructorIds.map(id => ({
-            instructor_id: id,
-            student_id: authUserId,
-            linked_via: 'discovery' as const,
-          }))
-          const { error: linkErr } = await supabase.from('instructor_students').upsert(rows)
-          if (linkErr) logger.warn('Signup: failed to link student to instructor(s)', linkErr)
-        }
-      }
-
-      // Re-fetch user in AuthContext so ProtectedRoute sees the new role
-      await refreshUser()
-
-      const destination = role === 'instructor' ? '/instructor/dashboard' : '/student/browse'
-      logger.info('Signup: complete, redirecting to', destination)
-      navigate(destination, { replace: true })
-    } catch (err: unknown) {
-      logger.error('Signup: verification/setup failed', err)
-      setError(err instanceof Error ? err.message : 'Verification failed')
     } finally {
       setLoading(false)
     }
@@ -183,30 +106,22 @@ export function Signup({ instructorId, instructorName }: Props) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center px-4">
         <div className="max-w-sm w-full mx-auto space-y-4">
-          <h1 className="text-xl font-bold text-gray-900">Verify your {step === 'verify_email' ? 'email' : 'phone'}</h1>
-          <p className="text-sm text-gray-600">
-            We sent a 6-digit code to <strong>{contact}</strong>.
-          </p>
-          <input
-            type="text"
-            inputMode="numeric"
-            maxLength={6}
-            value={otp}
-            onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-            placeholder="000000"
-            autoFocus
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-900">Check your {step === 'verify_email' ? 'email' : 'phone'}</h1>
+            <p className="text-sm text-gray-600 mt-2">
+              We sent a confirmation link to <strong>{contact}</strong>.
+            </p>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <p className="text-sm text-indigo-900">
+              Click the link in your {step === 'verify_email' ? 'email' : 'text message'} to confirm your account. You'll be all set!
+            </p>
+          </div>
           <button
-            onClick={handleVerifyOtp}
-            disabled={loading || otp.length < 6}
-            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
+            onClick={() => { setStep('form') }}
+            className="w-full text-sm text-gray-500 hover:text-gray-700"
           >
-            {loading ? 'Verifying…' : 'Verify & Create Account'}
-          </button>
-          <button onClick={() => { setStep('form'); setOtp('') }} className="w-full text-sm text-gray-500">
-            ← Back
+            ← Back to form
           </button>
         </div>
       </div>
@@ -344,7 +259,7 @@ export function Signup({ instructorId, instructorName }: Props) {
           </div>
 
           <p className="text-xs text-gray-400">
-            You'll receive a verification code to confirm your email or phone.
+            You'll receive a confirmation link to verify your email or phone.
           </p>
 
           {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -354,7 +269,7 @@ export function Signup({ instructorId, instructorName }: Props) {
             disabled={loading || !canSubmit}
             className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
           >
-            {loading ? 'Sending code…' : 'Create Account'}
+            {loading ? 'Sending link…' : 'Create Account'}
           </button>
 
           <p className="text-center text-sm text-gray-500">

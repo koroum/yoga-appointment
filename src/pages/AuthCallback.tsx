@@ -47,9 +47,60 @@ export function AuthCallback() {
           .maybeSingle()
 
         if (userError) logger.warn('AuthCallback: could not fetch role', userError)
-        logger.info('AuthCallback: role =', userData?.role, '→ redirecting')
 
-        if (userData?.role === 'instructor') {
+        // If user doesn't have a profile yet, create it from auth metadata
+        if (!userData) {
+          const name = user.user_metadata?.name || 'User'
+          const role = user.user_metadata?.role || 'student'
+          const phone = user.user_metadata?.phone || null
+          const selectedInstructorIds = user.user_metadata?.selectedInstructorIds || []
+          const prefilledInstructorId = user.user_metadata?.prefilledInstructorId
+
+          logger.debug('AuthCallback: creating profile for', user.id, 'name=', name, 'role=', role)
+
+          const userRow = {
+            id: user.id,
+            name,
+            role,
+            email: user.email || null,
+            phone,
+            username: role === 'instructor'
+              ? name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+              : null,
+          }
+
+          const { error: upsertErr } = await supabase.from('users').upsert(userRow)
+          if (upsertErr) {
+            logger.error('AuthCallback: failed to create user profile', upsertErr)
+            if (upsertErr.message.includes('users_phone_key')) {
+              throw new Error('This phone number is already in use.')
+            }
+            throw upsertErr
+          }
+          logger.info('AuthCallback: profile created for', user.id)
+
+          // Link student to instructor(s)
+          if (role === 'student') {
+            const instructorIds = prefilledInstructorId
+              ? [prefilledInstructorId]
+              : selectedInstructorIds
+
+            if (instructorIds.length > 0) {
+              logger.debug('AuthCallback: linking student to', instructorIds.length, 'instructor(s)')
+              const rows = instructorIds.map((id: string) => ({
+                instructor_id: id,
+                student_id: user.id,
+                linked_via: 'discovery' as const,
+              }))
+              const { error: linkErr } = await supabase.from('instructor_students').upsert(rows)
+              if (linkErr) logger.warn('AuthCallback: failed to link student to instructor(s)', linkErr)
+            }
+          }
+        }
+
+        logger.info('AuthCallback: role =', userData?.role || user.user_metadata?.role, '→ redirecting')
+
+        if (userData?.role === 'instructor' || user.user_metadata?.role === 'instructor') {
           navigate('/instructor/dashboard', { replace: true })
         } else {
           navigate('/student/browse', { replace: true })
