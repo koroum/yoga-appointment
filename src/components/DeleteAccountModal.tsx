@@ -30,60 +30,82 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
 
   async function loadActiveBookings() {
     try {
+      // Use a simpler query approach: fetch bookings, then enrich with slot/class data
       if (role === 'instructor') {
-        const { data, error } = await supabase
+        // Get all slots for this instructor, then find bookings on those slots
+        const { data: slots } = await supabase
+          .from('slots')
+          .select('id, starts_at, class:classes(title)')
+          .eq('instructor_id', userId)
+          .gt('starts_at', new Date().toISOString())
+
+        if (!slots || slots.length === 0) {
+          setActiveBookings([])
+          return
+        }
+
+        const slotIds = slots.map(s => s.id)
+        const { data: bookings, error } = await supabase
           .from('bookings')
-          .select('id, status, student:users!bookings_student_id_fkey(name), slot:slots(starts_at, instructor_id, class:classes(title))')
-          .eq('slot.instructor_id', userId)
+          .select('id, slot_id, student:users!bookings_student_id_fkey(name)')
+          .in('slot_id', slotIds)
           .in('status', ['pending', 'confirmed', 'cancellation_requested'])
 
         if (error) throw error
-        const bookings: ActiveBooking[] = (data ?? [])
-          .filter((b: Record<string, unknown>) => b.slot !== null)
-          .filter((b: Record<string, unknown>) => {
-            const slot = b.slot as { starts_at: string }
-            return new Date(slot.starts_at) > new Date()
-          })
-          .map((b: Record<string, unknown>) => {
-            const slot = b.slot as { starts_at: string; class: { title: string } }
-            const student = b.student as { name: string }
-            return {
-              booking_id: b.id as string,
-              class_title: slot.class?.title ?? 'Class',
-              starts_at: slot.starts_at,
-              student_name: student?.name,
-            }
-          })
-        setActiveBookings(bookings)
+
+        const slotMap = new Map(slots.map(s => [s.id, s]))
+        const result: ActiveBooking[] = (bookings ?? []).map(b => {
+          const slot = slotMap.get(b.slot_id)!
+          const cls = Array.isArray(slot.class) ? slot.class[0] as { title: string } | undefined : slot.class as { title: string } | null
+          const student = Array.isArray(b.student) ? b.student[0] as { name: string } | undefined : b.student as { name: string } | null
+          return {
+            booking_id: b.id,
+            class_title: cls?.title ?? 'Class',
+            starts_at: slot.starts_at,
+            student_name: student?.name,
+          }
+        })
+        logger.debug('DeleteAccountModal: instructor active bookings', result.length)
+        setActiveBookings(result)
       } else {
-        const { data, error } = await supabase
+        // Student: get their bookings, then fetch slot details
+        const { data: bookings, error } = await supabase
           .from('bookings')
-          .select('id, status, slot:slots(starts_at, class:classes(title), instructor:users!slots_instructor_id_fkey(name))')
+          .select('id, slot_id')
           .eq('student_id', userId)
           .in('status', ['pending', 'confirmed', 'cancellation_requested'])
 
-        if (error) {
-          logger.error('DeleteAccountModal: student bookings query failed', error)
-          throw error
+        if (error) throw error
+        logger.debug('DeleteAccountModal: student bookings count', bookings?.length)
+
+        if (!bookings || bookings.length === 0) {
+          setActiveBookings([])
+          return
         }
-        logger.debug('DeleteAccountModal: student bookings raw data', data?.length, 'rows')
-        const bookings: ActiveBooking[] = (data ?? [])
-          .filter((b: Record<string, unknown>) => b.slot !== null)
-          .filter((b: Record<string, unknown>) => {
-            const slot = b.slot as { starts_at: string }
-            return new Date(slot.starts_at) > new Date()
-          })
-          .map((b: Record<string, unknown>) => {
-            const slot = b.slot as { starts_at: string; class: { title: string }; instructor: { name: string } }
+
+        const slotIds = bookings.map(b => b.slot_id)
+        const { data: slots } = await supabase
+          .from('slots')
+          .select('id, starts_at, class:classes(title), instructor:users!slots_instructor_id_fkey(name)')
+          .in('id', slotIds)
+          .gt('starts_at', new Date().toISOString())
+
+        const slotMap = new Map((slots ?? []).map(s => [s.id, s]))
+        const result: ActiveBooking[] = bookings
+          .filter(b => slotMap.has(b.slot_id))
+          .map(b => {
+            const slot = slotMap.get(b.slot_id)!
+            const cls = Array.isArray(slot.class) ? slot.class[0] as { title: string } | undefined : slot.class as { title: string } | null
+            const inst = Array.isArray(slot.instructor) ? slot.instructor[0] as { name: string } | undefined : slot.instructor as { name: string } | null
             return {
-              booking_id: b.id as string,
-              class_title: slot.class?.title ?? 'Class',
+              booking_id: b.id,
+              class_title: cls?.title ?? 'Class',
               starts_at: slot.starts_at,
-              instructor_name: slot.instructor?.name,
+              instructor_name: inst?.name,
             }
           })
-        logger.debug('DeleteAccountModal: student active bookings', bookings.length)
-        setActiveBookings(bookings)
+        logger.debug('DeleteAccountModal: student active bookings', result.length)
+        setActiveBookings(result)
       }
     } catch (err) {
       logger.error('DeleteAccountModal: failed to load bookings', err)
