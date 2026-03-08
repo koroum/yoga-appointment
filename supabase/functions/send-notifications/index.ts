@@ -90,13 +90,22 @@ async function sendSms(to: string, body: string): Promise<boolean> {
   }
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const body = await req.json().catch(() => ({}))
     const { booking_id, type } = body as { booking_id?: string; type?: string }
 
-    if (!booking_id) return new Response(JSON.stringify({ ok: false, error: 'booking_id required' }), { status: 400 })
-    if (!type) return new Response(JSON.stringify({ ok: false, error: 'type required' }), { status: 400 })
+    if (!booking_id) return new Response(JSON.stringify({ ok: false, error: 'booking_id required' }), { status: 400, headers: corsHeaders })
+    if (!type) return new Response(JSON.stringify({ ok: false, error: 'type required' }), { status: 400, headers: corsHeaders })
 
     const supabase = createClient(supabaseUrl, serviceKey)
 
@@ -178,10 +187,10 @@ Deno.serve(async (req: Request) => {
     })
 
     return new Response(JSON.stringify({ ok: true, sent, emailOk, smsOk }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return new Response(JSON.stringify({ ok: false, error: message }), { status: 500 })
+    return new Response(JSON.stringify({ ok: false, error: message }), { status: 500, headers: corsHeaders })
   }
 })

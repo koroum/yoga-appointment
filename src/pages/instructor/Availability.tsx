@@ -202,7 +202,7 @@ export function Availability() {
     const { data, error } = await supabase.functions.invoke('generate-slots', { body: { instructor_id: user!.id } })
     if (error) {
       logger.error('Availability: generate-slots failed', error)
-      setError('Slots could not be generated automatically. Make sure edge functions are running (npx supabase functions serve).')
+      setError('Slots could not be generated automatically. Please try again or contact support.')
     } else {
       logger.info('Availability: generate-slots result', data)
     }

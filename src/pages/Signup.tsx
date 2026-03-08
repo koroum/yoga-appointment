@@ -15,7 +15,7 @@ export function Signup({ instructorId, instructorName }: Props) {
   const [searchParams] = useSearchParams()
   const prefilledInstructorId = instructorId ?? searchParams.get('instructor') ?? undefined
 
-  const [role, setRole] = useState<UserRole>('instructor')
+  const [role, setRole] = useState<UserRole | null>(prefilledInstructorId ? 'student' : null)
   const [availableInstructors, setAvailableInstructors] = useState<{ id: string; name: string }[]>([])
   const [selectedInstructorIds, setSelectedInstructorIds] = useState<Set<string>>(new Set())
   const [name, setName] = useState('')
@@ -48,7 +48,7 @@ export function Signup({ instructorId, instructorName }: Props) {
   const hasPhone = phone.trim().length > 0
   const passwordsMatch = password === confirmPassword
   const needsInstructorPick = role === 'student' && !prefilledInstructorId && availableInstructors.length > 0
-  const canSubmit = name.trim() && (hasEmail || hasPhone) && password.length >= 6 && passwordsMatch && (!needsInstructorPick || selectedInstructorIds.size > 0)
+  const canSubmit = role && name.trim() && (hasEmail || hasPhone) && password.length >= 6 && passwordsMatch && (!needsInstructorPick || selectedInstructorIds.size > 0)
 
   /** Strip all non-digit characters except leading '+' */
   function normalizePhone(raw: string): string {
@@ -68,6 +68,7 @@ export function Signup({ instructorId, instructorName }: Props) {
   }
 
   function validateForm(): string | null {
+    if (!role) return 'Please select whether you are an instructor or student.'
     if (!name.trim()) return 'Please enter your name.'
     if (!hasEmail && !hasPhone) return 'Please enter at least your email or phone number.'
     if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Please enter a valid email address.'
@@ -150,24 +151,29 @@ export function Signup({ instructorId, instructorName }: Props) {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Booking</h1>
             <p className="text-gray-500 mb-6 text-sm">Create your account</p>
 
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4">
+            <p className="text-sm font-medium text-gray-700 mb-2">I am signing up as:</p>
+            <div className="flex gap-3 mb-4">
               <button
                 onClick={() => setRole('instructor')}
-                className={`flex-1 py-2 text-sm font-medium ${role === 'instructor' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}
+                className={`flex-1 py-3 rounded-lg text-sm font-medium border-2 transition-colors ${role === 'instructor' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
               >
-                I'm an instructor
+                Instructor
               </button>
               <button
                 onClick={() => setRole('student')}
-                className={`flex-1 py-2 text-sm font-medium ${role === 'student' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-600'}`}
+                className={`flex-1 py-3 rounded-lg text-sm font-medium border-2 transition-colors ${role === 'student' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
               >
-                I'm a student
+                Student
               </button>
             </div>
           </>
         )}
 
-        <div className="space-y-4">
+        {!role && !prefilledInstructorId && (
+          <p className="text-xs text-gray-400 text-center">Please select your role to continue</p>
+        )}
+
+        <div className={`space-y-4 ${!role ? 'hidden' : ''}`}>
           {needsInstructorPick && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

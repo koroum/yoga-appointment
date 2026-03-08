@@ -1,4 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <circle cx="16" cy="16" r="15" fill="#4f46e5"/>
-  <text x="16" y="22" text-anchor="middle" font-size="20" fill="white">Y</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Warm golden background circle (like ancient temple gold) -->
+  <circle cx="32" cy="32" r="31" fill="#F59E0B"/>
+
+  <!-- Inner deep saffron ring -->
+  <circle cx="32" cy="32" r="26" fill="#D97706"/>
+
+  <!-- Sacred lotus petals (8 petals in vermillion/kumkum red) -->
+  <g fill="#DC2626" opacity="0.9">
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(0 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(45 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(90 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(135 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(180 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(225 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(270 32 32)"/>
+    <ellipse cx="32" cy="12" rx="5" ry="9" transform="rotate(315 32 32)"/>
+  </g>
+
+  <!-- Inner lotus petals (smaller, deeper red) -->
+  <g fill="#991B1B" opacity="0.8">
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(22.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(67.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(112.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(157.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(202.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(247.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(292.5 32 32)"/>
+    <ellipse cx="32" cy="17" rx="3.5" ry="6" transform="rotate(337.5 32 32)"/>
+  </g>
+
+  <!-- Center bindu (sacred center point - deep maroon) -->
+  <circle cx="32" cy="32" r="7" fill="#7C2D12"/>
+  <circle cx="32" cy="32" r="5" fill="#F59E0B"/>
+
+  <!-- Om-inspired dot at center -->
+  <circle cx="32" cy="32" r="2.5" fill="#7C2D12"/>
+
+  <!-- Outer decorative dots (like ancient mandala border) -->
+  <g fill="#FDE68A">
+    <circle cx="32" cy="3" r="1.5"/>
+    <circle cx="32" cy="61" r="1.5"/>
+    <circle cx="3" cy="32" r="1.5"/>
+    <circle cx="61" cy="32" r="1.5"/>
+    <circle cx="11.5" cy="11.5" r="1.5"/>
+    <circle cx="52.5" cy="52.5" r="1.5"/>
+    <circle cx="52.5" cy="11.5" r="1.5"/>
+    <circle cx="11.5" cy="52.5" r="1.5"/>
+    <circle cx="20" cy="5.5" r="1.2"/>
+    <circle cx="44" cy="5.5" r="1.2"/>
+    <circle cx="5.5" cy="20" r="1.2"/>
+    <circle cx="5.5" cy="44" r="1.2"/>
+    <circle cx="58.5" cy="20" r="1.2"/>
+    <circle cx="58.5" cy="44" r="1.2"/>
+    <circle cx="20" cy="58.5" r="1.2"/>
+    <circle cx="44" cy="58.5" r="1.2"/>
+  </g>
 </svg>
