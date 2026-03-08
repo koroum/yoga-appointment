@@ -23,6 +23,7 @@ export function StudentProfile() {
   const [linkError, setLinkError] = useState<string | null>(null)
   const [linking, setLinking] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [unlinkBlockedBookings, setUnlinkBlockedBookings] = useState<{ instructorId: string; instructorName: string; bookings: { class_title: string; starts_at: string }[] } | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -131,6 +132,37 @@ export function StudentProfile() {
   async function handleUnlink(instructorId: string) {
     setActing(instructorId)
     try {
+      // Check for active bookings with this instructor
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id, slot_id')
+        .eq('student_id', user!.id)
+        .in('status', ['pending', 'confirmed', 'cancellation_requested'])
+
+      if (bookings && bookings.length > 0) {
+        const slotIds = bookings.map(b => b.slot_id)
+        const { data: slots } = await supabase
+          .from('slots')
+          .select('id, starts_at, instructor_id, class:classes(title)')
+          .in('id', slotIds)
+          .eq('instructor_id', instructorId)
+          .gt('starts_at', new Date().toISOString())
+
+        if (slots && slots.length > 0) {
+          const instructor = linked.find(l => l.id === instructorId)
+          setUnlinkBlockedBookings({
+            instructorId,
+            instructorName: instructor?.name ?? 'this instructor',
+            bookings: slots.map(s => {
+              const cls = Array.isArray(s.class) ? s.class[0] as { title: string } | undefined : s.class as { title: string } | null
+              return { class_title: cls?.title ?? 'Class', starts_at: s.starts_at }
+            }),
+          })
+          return
+        }
+      }
+
+      // No active bookings — proceed with unlink
       const { error } = await supabase
         .from('instructor_students')
         .delete()
@@ -252,6 +284,38 @@ export function StudentProfile() {
             role="student"
             onClose={() => setShowDeleteModal(false)}
           />
+        )}
+
+        {unlinkBlockedBookings && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+              <h2 className="text-lg font-bold text-gray-900">Cannot Remove Instructor</h2>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-amber-800 font-semibold">
+                  You have {unlinkBlockedBookings.bookings.length} upcoming booking{unlinkBlockedBookings.bookings.length > 1 ? 's' : ''} with {unlinkBlockedBookings.instructorName}:
+                </p>
+                <ul className="space-y-1">
+                  {unlinkBlockedBookings.bookings.map((b, idx) => (
+                    <li key={idx} className="text-xs text-amber-700">
+                      {b.class_title} — {new Date(b.starts_at).toLocaleDateString('en-US', {
+                        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                        timeZone: 'America/New_York',
+                      })}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-amber-700 mt-2">
+                  Please cancel your booking{unlinkBlockedBookings.bookings.length > 1 ? 's' : ''} first before removing this instructor.
+                </p>
+              </div>
+              <button
+                onClick={() => setUnlinkBlockedBookings(null)}
+                className="w-full py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                OK
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
