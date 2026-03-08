@@ -67,34 +67,20 @@ export function Signup({ instructorId, instructorName }: Props) {
     setLoading(true)
 
     try {
-      if (hasEmail) {
-        logger.debug('Signup: sending magic link to email', email.trim())
-        const { error } = await supabase.auth.signInWithOtp({
-          email: email.trim(),
-          options: {
-            shouldCreateUser: true,
-            data: { name: name.trim(), role, phone: hasPhone ? phone.trim() : null, password, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
-            emailRedirectTo: `${window.location.origin}/auth/callback`
-          },
-        })
-        if (error) throw error
-        logger.info('Signup: magic link sent to email')
-        setStep('verify_email')
-      } else {
-        logger.debug('Signup: sending magic link to phone', phone.trim())
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: phone.trim(),
-          options: {
-            shouldCreateUser: true,
-            data: { name: name.trim(), role, email: null, password, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
-          },
-        })
-        if (error) throw error
-        logger.info('Signup: magic link sent to phone')
-        setStep('verify_phone')
-      }
+      logger.debug('Signup: creating account for', email.trim())
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { name: name.trim(), role, phone: hasPhone ? phone.trim() : null, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        },
+      })
+      if (error) throw error
+      logger.info('Signup: confirmation email sent')
+      setStep('verify_email')
     } catch (err: unknown) {
-      logger.error('Signup: failed to send magic link', err)
+      logger.error('Signup: failed to create account', err)
       setError(err instanceof Error ? err.message : 'Signup failed')
     } finally {
       setLoading(false)

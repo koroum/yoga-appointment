@@ -53,21 +53,10 @@ export function AuthCallback() {
           const name = user.user_metadata?.name || 'User'
           const role = user.user_metadata?.role || 'student'
           const phone = user.user_metadata?.phone || null
-          const password = user.user_metadata?.password
           const selectedInstructorIds = user.user_metadata?.selectedInstructorIds || []
           const prefilledInstructorId = user.user_metadata?.prefilledInstructorId
 
           logger.debug('AuthCallback: creating profile for', user.id, 'name=', name, 'role=', role)
-
-          // Set password so user can log in with email+password
-          if (password) {
-            logger.debug('AuthCallback: setting password for user', user.id)
-            const { error: pwErr } = await supabase.auth.updateUser({ password })
-            if (pwErr) {
-              logger.error('AuthCallback: failed to set password', pwErr)
-              throw pwErr
-            }
-          }
 
           const userRow = {
             id: user.id,
