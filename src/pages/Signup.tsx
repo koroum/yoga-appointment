@@ -73,7 +73,7 @@ export function Signup({ instructorId, instructorName }: Props) {
           email: email.trim(),
           options: {
             shouldCreateUser: true,
-            data: { name: name.trim(), role, phone: hasPhone ? phone.trim() : null, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
+            data: { name: name.trim(), role, phone: hasPhone ? phone.trim() : null, password, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
             emailRedirectTo: `${window.location.origin}/auth/callback`
           },
         })
@@ -86,7 +86,7 @@ export function Signup({ instructorId, instructorName }: Props) {
           phone: phone.trim(),
           options: {
             shouldCreateUser: true,
-            data: { name: name.trim(), role, email: null, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
+            data: { name: name.trim(), role, email: null, password, selectedInstructorIds: [...selectedInstructorIds], prefilledInstructorId },
           },
         })
         if (error) throw error
