@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Navbar } from '../../components/Navbar'
+import { DeleteAccountModal } from '../../components/DeleteAccountModal'
 import { logger } from '../../utils/logger'
 
 interface LinkedInstructor {
@@ -21,6 +22,7 @@ export function StudentProfile() {
   const [linkInput, setLinkInput] = useState('')
   const [linkError, setLinkError] = useState<string | null>(null)
   const [linking, setLinking] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -232,6 +234,24 @@ export function StudentProfile() {
               </div>
             </section>
           </>
+        )}
+
+        {/* Delete Account */}
+        <div className="pt-2 border-t border-gray-200">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="w-full py-2.5 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+          >
+            Delete Account
+          </button>
+        </div>
+
+        {showDeleteModal && (
+          <DeleteAccountModal
+            userId={user!.id}
+            role="student"
+            onClose={() => setShowDeleteModal(false)}
+          />
         )}
       </div>
     </div>

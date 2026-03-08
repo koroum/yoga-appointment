@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Navbar } from '../../components/Navbar'
+import { DeleteAccountModal } from '../../components/DeleteAccountModal'
 import { compressImage } from '../../utils/imageCompression'
 import { logger } from '../../utils/logger'
 
@@ -21,6 +22,7 @@ export function InstructorProfile() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   useEffect(() => {
     if (user) loadProfile()
@@ -230,6 +232,24 @@ export function InstructorProfile() {
         >
           {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Profile'}
         </button>
+
+        {/* Delete Account */}
+        <div className="pt-6 border-t border-gray-200">
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="w-full py-2.5 rounded-lg text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+          >
+            Delete Account
+          </button>
+        </div>
+
+        {showDeleteModal && (
+          <DeleteAccountModal
+            userId={user!.id}
+            role="instructor"
+            onClose={() => setShowDeleteModal(false)}
+          />
+        )}
       </div>
     </div>
   )
