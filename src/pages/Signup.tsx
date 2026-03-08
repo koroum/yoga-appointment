@@ -48,14 +48,14 @@ export function Signup({ instructorId, instructorName }: Props) {
   const hasPhone = phone.trim().length > 0
   const passwordsMatch = password === confirmPassword
   const needsInstructorPick = role === 'student' && !prefilledInstructorId && availableInstructors.length > 0
-  const canSubmit = name.trim() && (hasEmail || hasPhone) && password.length >= 8 && passwordsMatch && (!needsInstructorPick || selectedInstructorIds.size > 0)
+  const canSubmit = name.trim() && (hasEmail || hasPhone) && password.length >= 6 && passwordsMatch && (!needsInstructorPick || selectedInstructorIds.size > 0)
 
   function validateForm(): string | null {
     if (!name.trim()) return 'Please enter your name.'
     if (!hasEmail && !hasPhone) return 'Please enter at least your email or phone number.'
     if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Please enter a valid email address.'
     if (hasPhone && !/^\+?[0-9\s\-().]{7,}$/.test(phone.trim())) return 'Please enter a valid phone number (e.g. +1 555 000 0000).'
-    if (password.length < 8) return 'Password must be at least 8 characters.'
+    if (password.length < 6) return 'Password must be at least 6 characters.'
     if (!passwordsMatch) return 'Passwords do not match.'
     return null
   }
@@ -235,7 +235,7 @@ export function Signup({ instructorId, instructorName }: Props) {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
+              placeholder="Minimum 6 characters"
               autoComplete="new-password"
               className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
