@@ -36,46 +36,28 @@ export function Login() {
         .eq('id', authUser.id)
         .maybeSingle()
 
-      // If no users row exists by ID, check if one exists by email (from a previous signup attempt)
+      // If no users row exists by ID, use RPC to create/update (bypasses RLS for re-signups)
       if (!userData) {
         const meta = authUser.user_metadata ?? {}
         const userRole = meta.role || 'student'
         const userName = meta.name || email.trim().split('@')[0]
 
-        // Check if a row exists with this email but a different auth ID
-        const { data: existingByEmail } = await supabase
-          .from('users')
-          .select('id, role')
-          .eq('email', authUser.email!)
-          .maybeSingle()
+        logger.info('Login: no users row found by ID, calling ensure_user_profile')
+        const { data: result, error: rpcErr } = await supabase.rpc('ensure_user_profile', {
+          p_user_id: authUser.id,
+          p_name: userName,
+          p_role: userRole,
+          p_email: authUser.email || '',
+          p_phone: authUser.phone ?? null,
+        })
 
-        if (existingByEmail) {
-          // Update the existing row to use the current auth user ID
-          logger.info('Login: found existing user by email, updating ID to', authUser.id)
-          const { error: updateErr } = await supabase
-            .from('users')
-            .update({ id: authUser.id })
-            .eq('email', authUser.email!)
-          if (updateErr) {
-            logger.error('Login: failed to update user ID', updateErr)
-            throw new Error('Could not link your account. Please contact support.')
-          }
-          userData = { role: existingByEmail.role }
-        } else {
-          logger.info('Login: no users row found, creating one with role=', userRole)
-          const { error: insertErr } = await supabase.from('users').upsert({
-            id: authUser.id,
-            name: userName,
-            role: userRole,
-            email: authUser.email ?? null,
-            phone: authUser.phone ?? null,
-          })
-          if (insertErr) {
-            logger.error('Login: failed to create user row', insertErr)
-            throw new Error('Your account setup is incomplete. Please try signing up again.')
-          }
-          userData = { role: userRole }
+        if (rpcErr) {
+          logger.error('Login: ensure_user_profile failed', rpcErr)
+          throw new Error('Your account setup is incomplete. Please try signing up again.')
         }
+
+        userData = { role: (result as { role: string })?.role || userRole }
+        logger.info('Login: profile', (result as { status: string })?.status, 'role=', userData.role)
       }
 
       const dest = userData.role === 'instructor' ? '/instructor/dashboard' : '/student/browse'

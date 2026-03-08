@@ -48,7 +48,8 @@ export function AuthCallback() {
 
         if (userError) logger.warn('AuthCallback: could not fetch role', userError)
 
-        // If user doesn't have a profile yet, create it from auth metadata
+        // If user doesn't have a profile yet, create it via RPC (bypasses RLS for re-signups)
+        let userRole = userData?.role
         if (!userData) {
           const name = user.user_metadata?.name || 'User'
           const role = user.user_metadata?.role || 'student'
@@ -56,47 +57,26 @@ export function AuthCallback() {
           const selectedInstructorIds = user.user_metadata?.selectedInstructorIds || []
           const prefilledInstructorId = user.user_metadata?.prefilledInstructorId
 
-          logger.debug('AuthCallback: creating profile for', user.id, 'name=', name, 'role=', role)
+          logger.debug('AuthCallback: ensuring profile for', user.id, 'name=', name, 'role=', role)
 
-          // Check if a row exists with this email but a different auth ID (re-signup)
-          const { data: existingByEmail } = await supabase
-            .from('users')
-            .select('id, role')
-            .eq('email', user.email!)
-            .maybeSingle()
+          const { data: result, error: rpcErr } = await supabase.rpc('ensure_user_profile', {
+            p_user_id: user.id,
+            p_name: name,
+            p_role: role,
+            p_email: user.email || '',
+            p_phone: phone,
+            p_username: role === 'instructor'
+              ? name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
+              : null,
+          })
 
-          if (existingByEmail && existingByEmail.id !== user.id) {
-            logger.info('AuthCallback: found existing user by email, updating ID from', existingByEmail.id, 'to', user.id)
-            const { error: updateErr } = await supabase
-              .from('users')
-              .update({ id: user.id, name, phone })
-              .eq('email', user.email!)
-            if (updateErr) {
-              logger.error('AuthCallback: failed to update user ID', updateErr)
-              throw updateErr
-            }
-          } else if (!existingByEmail) {
-            const userRow = {
-              id: user.id,
-              name,
-              role,
-              email: user.email || null,
-              phone,
-              username: role === 'instructor'
-                ? name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
-                : null,
-            }
-
-            const { error: upsertErr } = await supabase.from('users').upsert(userRow)
-            if (upsertErr) {
-              logger.error('AuthCallback: failed to create user profile', upsertErr)
-              if (upsertErr.message.includes('users_phone_key')) {
-                throw new Error('This phone number is already in use.')
-              }
-              throw upsertErr
-            }
+          if (rpcErr) {
+            logger.error('AuthCallback: ensure_user_profile failed', rpcErr)
+            throw rpcErr
           }
-          logger.info('AuthCallback: profile created/updated for', user.id)
+
+          userRole = (result as { status: string; role: string })?.role || role
+          logger.info('AuthCallback: profile', (result as { status: string })?.status, 'for', user.id, 'role=', userRole)
 
           // Link student to instructor(s)
           if (role === 'student') {
@@ -117,9 +97,9 @@ export function AuthCallback() {
           }
         }
 
-        logger.info('AuthCallback: role =', userData?.role || user.user_metadata?.role, '→ redirecting')
+        logger.info('AuthCallback: role =', userRole, '→ redirecting')
 
-        if (userData?.role === 'instructor' || user.user_metadata?.role === 'instructor') {
+        if (userRole === 'instructor') {
           navigate('/instructor/dashboard', { replace: true })
         } else {
           navigate('/student/browse', { replace: true })
