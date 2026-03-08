@@ -170,7 +170,15 @@ export function Signup({ instructorId, instructorName }: Props) {
         )}
 
         {!role && !prefilledInstructorId && (
-          <p className="text-xs text-gray-400 text-center">Please select your role to continue</p>
+          <div className="text-center space-y-3">
+            <p className="text-xs text-gray-400">Please select your role to continue</p>
+            <button
+              onClick={() => window.history.back()}
+              className="text-sm text-indigo-600 font-medium"
+            >
+              ← Go back
+            </button>
+          </div>
         )}
 
         <div className={`space-y-4 ${!role ? 'hidden' : ''}`}>
