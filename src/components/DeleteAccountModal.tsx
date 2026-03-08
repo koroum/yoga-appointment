@@ -49,7 +49,7 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
           .from('bookings')
           .select('id, slot_id, student:users!bookings_student_id_fkey(name)')
           .in('slot_id', slotIds)
-          .in('status', ['pending', 'confirmed', 'cancellation_requested'])
+          .in('status', ['confirmed', 'cancellation_requested'])
 
         if (error) throw error
 
@@ -73,7 +73,7 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
           .from('bookings')
           .select('id, slot_id')
           .eq('student_id', userId)
-          .in('status', ['pending', 'confirmed', 'cancellation_requested'])
+          .in('status', ['confirmed', 'cancellation_requested'])
 
         if (error) throw error
         logger.debug('DeleteAccountModal: student bookings count', bookings?.length)

@@ -19,9 +19,22 @@ begin
     return jsonb_build_object('deleted', false, 'error', 'User not found');
   end if;
 
-  -- Find and cancel active bookings for future slots
+  -- Silently cancel pending (unconfirmed) bookings — no warnings or notifications
   if v_role = 'instructor' then
-    -- Cancel all active bookings on this instructor's slots
+    update bookings set status = 'cancelled'
+    where id in (
+      select b.id from bookings b
+      join slots s on s.id = b.slot_id
+      where s.instructor_id = p_user_id and b.status = 'pending' and s.starts_at > now()
+    );
+  else
+    update bookings set status = 'cancelled'
+    where student_id = p_user_id and status = 'pending'
+      and slot_id in (select id from slots where starts_at > now());
+  end if;
+
+  -- Cancel confirmed/cancellation_requested bookings and collect for notification
+  if v_role = 'instructor' then
     for v_booking in
       select b.id as booking_id, b.student_id,
              s.starts_at, c.title as class_title,
@@ -31,7 +44,7 @@ begin
       join classes c on c.id = s.class_id
       join users st on st.id = b.student_id
       where s.instructor_id = p_user_id
-        and b.status in ('pending', 'confirmed', 'cancellation_requested')
+        and b.status in ('confirmed', 'cancellation_requested')
         and s.starts_at > now()
     loop
       update bookings set status = 'cancelled' where id = v_booking.booking_id;
@@ -43,7 +56,6 @@ begin
       );
     end loop;
   else
-    -- Cancel all active bookings by this student
     for v_booking in
       select b.id as booking_id, s.instructor_id,
              s.starts_at, c.title as class_title,
@@ -53,7 +65,7 @@ begin
       join classes c on c.id = s.class_id
       join users inst on inst.id = s.instructor_id
       where b.student_id = p_user_id
-        and b.status in ('pending', 'confirmed', 'cancellation_requested')
+        and b.status in ('confirmed', 'cancellation_requested')
         and s.starts_at > now()
     loop
       update bookings set status = 'cancelled' where id = v_booking.booking_id;
