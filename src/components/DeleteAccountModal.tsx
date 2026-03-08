@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { logger } from '../utils/logger'
 
@@ -24,9 +24,9 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Load active bookings on mount
-  useState(() => {
+  useEffect(() => {
     loadActiveBookings()
-  })
+  }, [])
 
   async function loadActiveBookings() {
     try {
@@ -62,7 +62,11 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
           .eq('student_id', userId)
           .in('status', ['pending', 'confirmed', 'cancellation_requested'])
 
-        if (error) throw error
+        if (error) {
+          logger.error('DeleteAccountModal: student bookings query failed', error)
+          throw error
+        }
+        logger.debug('DeleteAccountModal: student bookings raw data', data?.length, 'rows')
         const bookings: ActiveBooking[] = (data ?? [])
           .filter((b: Record<string, unknown>) => b.slot !== null)
           .filter((b: Record<string, unknown>) => {
@@ -78,6 +82,7 @@ export function DeleteAccountModal({ userId, role, onClose }: Props) {
               instructor_name: slot.instructor?.name,
             }
           })
+        logger.debug('DeleteAccountModal: student active bookings', bookings.length)
         setActiveBookings(bookings)
       }
     } catch (err) {
